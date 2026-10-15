@@ -5,7 +5,8 @@ import { usePlayables } from './PlayablesWrapper';
 import { languageManager, WordEntry } from './Language';
 
 export const GameView: React.FC = () => {
-  const logicRef = useRef(new GameLogic());
+  const logicRef = useRef<GameLogic | null>(null);
+  const logic = logicRef.current ?? (logicRef.current = new GameLogic());
   const playables = usePlayables();
 
   const [uiScore, setUiScore] = useState(0);
@@ -26,22 +27,22 @@ export const GameView: React.FC = () => {
   const isEffectivePaused = playables.isPaused || isPaused;
 
   useEffect(() => {
+    logic.initializeInputManager();
     if (playables.savedData) {
       try {
         const data = JSON.parse(playables.savedData);
-        logicRef.current.loadSaveData(data);
-        setUiLevel(logicRef.current.playerLevel);
-        setUiXp(logicRef.current.playerXp);
-        setUiAchievementsCount(logicRef.current.achievements.size);
+        logic.loadSaveData(data);
+        setUiLevel(logic.playerLevel);
+        setUiXp(logic.playerXp);
+        setUiAchievementsCount(logic.achievements.size);
       } catch (e) { 
         // Ignore parse errors 
       }
     }
-    return () => logicRef.current.inputManager.destroy();
+    return () => logic.destroyInputManager();
   }, [playables.savedData]);
 
   const handleUpdate = (dt: number, vp: ViewportContext) => {
-    const logic = logicRef.current;
     logic.update(dt, vp, isEffectivePaused);
 
     if (!isEffectivePaused && logic.status === 'playing') {
@@ -70,8 +71,6 @@ export const GameView: React.FC = () => {
   };
 
   const handleRender = (ctx: CanvasRenderingContext2D, vp: ViewportContext) => {
-    const logic = logicRef.current;
-
     // Screen Shake
     if (logic.screenShakeTime > 0) {
       const mag = logic.screenShakeTime * 20;
@@ -223,15 +222,17 @@ export const GameView: React.FC = () => {
     }
   };
 
-  const handleFire = () => logicRef.current.fireWord();
-  const handleClear = () => logicRef.current.clearWord();
+  const handleFire = () => logic.fireWord();
+  const handleClear = () => logic.clearWord();
+  const stopGameInput = (event: React.PointerEvent<HTMLButtonElement>) =>
+    event.stopPropagation();
   const togglePause = () => {
     setIsPaused(!isPaused);
-    logicRef.current.togglePause();
+    logic.togglePause();
   };
-  const startGame = () => logicRef.current.start();
+  const startGame = () => logic.start();
   const returnToMenu = () => {
-    logicRef.current.status = 'menu';
+    logic.status = 'menu';
     setUiStatus('menu');
   };
 
@@ -264,8 +265,8 @@ export const GameView: React.FC = () => {
   const xpRequired = xpForNextLvl - xpForCurrentLvl;
   const xpPercent = Math.min(100, (xpProgress / xpRequired) * 100);
 
-  const runAccuracy = logicRef.current.runAttempts > 0 
-    ? Math.floor((logicRef.current.runHits / logicRef.current.runAttempts) * 100) 
+  const runAccuracy = logic.runAttempts > 0
+    ? Math.floor((logic.runHits / logic.runAttempts) * 100)
     : 0;
 
   return (
@@ -295,7 +296,7 @@ export const GameView: React.FC = () => {
                 {uiHp}%
               </div>
             </div>
-            <button style={styles.pauseBtn} onPointerDown={togglePause}>
+            <button type="button" style={styles.pauseBtn} onPointerDown={stopGameInput} onClick={togglePause}>
               {isEffectivePaused ? '▶' : '⏸'}
             </button>
           </div>
@@ -322,8 +323,8 @@ export const GameView: React.FC = () => {
               {uiWord || <span style={{ opacity: 0.3 }}>{langUI.tap_letters}</span>}
             </div>
             <div style={styles.controlsRow}>
-              <button style={styles.clearBtn} onPointerDown={handleClear}>{langUI.clear}</button>
-              <button style={styles.fireBtn} onPointerDown={handleFire}>{langUI.fire}</button>
+              <button type="button" style={styles.clearBtn} onPointerDown={stopGameInput} onClick={handleClear}>{langUI.clear}</button>
+              <button type="button" style={styles.fireBtn} onPointerDown={stopGameInput} onClick={handleFire}>{langUI.fire}</button>
             </div>
           </div>
         </div>
@@ -344,12 +345,12 @@ export const GameView: React.FC = () => {
             </div>
 
             <div style={{marginBottom: '20px'}}>
-               <button style={styles.langBtn} onPointerDown={toggleLanguage}>
+               <button type="button" style={styles.langBtn} onPointerDown={stopGameInput} onClick={toggleLanguage}>
                  {langUI.language_btn}
                </button>
             </div>
 
-            <button style={{...styles.actionBtn, backgroundColor: '#00FFFF', color: '#000'}} onPointerDown={startGame}>
+            <button type="button" style={{...styles.actionBtn, backgroundColor: '#00FFFF', color: '#000'}} onPointerDown={stopGameInput} onClick={startGame}>
               {langUI.play_btn}
             </button>
           </div>
@@ -367,17 +368,17 @@ export const GameView: React.FC = () => {
                  <h3 style={{color: '#00FFFF', marginTop: 0}}>{langUI.run_stats}</h3>
                  <p style={styles.modalText}>Final Score: <strong style={{color:'#00FFFF'}}>{uiScore}</strong></p>
                  <p style={styles.modalText}>Waves Survived: <strong style={{color:'#FFFFFF'}}>{uiWave}</strong></p>
-                 <p style={styles.modalText}>{langUI.xp} Earned: <strong style={{color:'#FFD700'}}>+{logicRef.current.runXpEarned}</strong></p>
+                 <p style={styles.modalText}>{langUI.xp} Earned: <strong style={{color:'#FFD700'}}>+{logic.runXpEarned}</strong></p>
                  <p style={styles.modalText}>{langUI.accuracy}: <strong style={{color: runAccuracy > 75 ? '#00FF00' : '#FF0033'}}>{runAccuracy}%</strong></p>
               </div>
 
               <div style={{...styles.progressionPanel, flex: '2', minWidth: '300px', maxHeight: '250px', display: 'flex', flexDirection: 'column'}}>
                  <h3 style={{color: '#00FFFF', marginTop: 0}}>{langUI.words_mastered}</h3>
                  <div style={styles.reviewList}>
-                   {logicRef.current.runWordsMastered.length === 0 && (
+                   {logic.runWordsMastered.length === 0 && (
                       <p style={{color: '#777'}}>No words mastered this run.</p>
                    )}
-                   {logicRef.current.runWordsMastered.map((w, i) => (
+                   {logic.runWordsMastered.map((w, i) => (
                       <div key={i} style={styles.reviewItem}>
                          <strong style={{color: getTierColor(w.tier)}}>{w.word}</strong>: {w.definition}
                       </div>
@@ -387,8 +388,8 @@ export const GameView: React.FC = () => {
             </div>
 
             <div style={{display: 'flex', gap: '20px', justifyContent: 'center'}}>
-              <button style={{...styles.actionBtn, backgroundColor: '#333'}} onPointerDown={returnToMenu}>{langUI.menu_btn}</button>
-              <button style={styles.actionBtn} onPointerDown={startGame}>{langUI.rematch_btn}</button>
+              <button type="button" style={{...styles.actionBtn, backgroundColor: '#333'}} onPointerDown={stopGameInput} onClick={returnToMenu}>{langUI.menu_btn}</button>
+              <button type="button" style={styles.actionBtn} onPointerDown={stopGameInput} onClick={startGame}>{langUI.rematch_btn}</button>
             </div>
           </div>
         </div>
@@ -399,7 +400,7 @@ export const GameView: React.FC = () => {
         <div style={styles.modalOverlay}>
           <div style={styles.modalContent}>
             <h1 style={styles.modalTitle}>{langUI.paused}</h1>
-            <button style={styles.actionBtn} onPointerDown={togglePause}>{langUI.resume}</button>
+            <button type="button" style={styles.actionBtn} onPointerDown={stopGameInput} onClick={togglePause}>{langUI.resume}</button>
           </div>
         </div>
       )}

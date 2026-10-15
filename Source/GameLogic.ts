@@ -89,10 +89,17 @@ export class GameLogic {
   private nextEnemyId = 0;
   private nextFeedbackId = 0;
 
-  public inputManager = new InputManager();
+  public inputManager: InputManager | null = null;
 
-  constructor() {
+  public initializeInputManager(): void {
+    this.destroyInputManager();
+    this.inputManager = new InputManager();
     this.inputManager.use(new InlineHammerGesturePlugin());
+  }
+
+  public destroyInputManager(): void {
+    this.inputManager?.destroy();
+    this.inputManager = null;
   }
 
   // Decodes Level safely from total XP to prevent desynchronization
@@ -401,7 +408,8 @@ export class GameLogic {
 
     this.playerY = vp.centerY;
 
-    const input = this.inputManager.processInput();
+    const input = this.inputManager?.processInput();
+    if (!input) return;
 
     // Handle Taps
     for (const evt of input.events) {
