@@ -4,14 +4,14 @@
  * Manages pointer tracking, coordinate normalization, gesture arbitration, and virtual joysticks.
  */
 
-import {
+import type {
   CoreInput,
   InputPlugin,
   JoystickPluginOptions,
   PluginContext,
 } from './InputManager.d';
 
-export {CoreInput, InputPlugin, JoystickPluginOptions, PluginContext};
+export type {CoreInput, InputPlugin, JoystickPluginOptions, PluginContext};
 
 // ============================================================================
 // 1. CORE POINTER TRACKER
